@@ -10,6 +10,7 @@ var slackAPI    = require('slackbotapi');
 var config      = require('./config');
 var async       = require('async');
 var cCase       = require('change-case');
+var plugins     = require('auto-loader').load(__dirname +'/plugins')
 
 // Configure SlackClient
 var slack = new slackAPI({
@@ -35,6 +36,16 @@ slack.on('message', function (data) {
           }
       }
 
-      slack.sendMsg(data.channel, "Sorry I don't know how to " + command[0].toLowerCase())
+      var action = command[0];
+      action = cCase.pascalCase(action)
+
+      // If plugin exists run the command and return the output
+      if(plugins.hasOwnProperty(action)){
+        var output = plugins[action].run();
+        slack.sendMsg(data.channel, output)
+      } else {
+        slack.sendMsg(data.channel, "Sorry I don't know how to " + command[0].toLowerCase())
+      }
+
     }
 });
