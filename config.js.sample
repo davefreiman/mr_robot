@@ -1,0 +1,7 @@
+var config = {};
+
+config.slack = {};
+config.slack.token = process.env.SLACK_TOKEN || false 
+config.slack.debug = Boolean(process.env.SLACK_DEBUG) || false
+config.slack.bot_name = process.env.BOT_NAME || false
+module.exports = config;
