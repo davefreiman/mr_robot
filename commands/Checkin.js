@@ -1,0 +1,99 @@
+// Error handler
+var whoops = function (err) {
+    if (err) {
+        console.log('Whoops Something went wrong: ' + err)
+    }
+};
+
+var waiting = true;
+
+
+exports.run = function(command,slack,async,data,queue) {
+  var message = "Alright, checking in with the team. I'll report back ASAP";
+  var users = command[1].split(' ');
+  var results = [];
+
+  // Filter empty users
+  users = users.filter(Boolean);
+
+  // Let the stakeholder know you are on it
+  slack.sendMsg(data.channel, message);
+
+  // Ask each user in parallel
+  async.each(users, function (user, callback) {
+      user = user.replace('<@', '').replace('>', '');
+      userId = slack.getUser(user).id;
+      queue[user] = [];
+      results[user] = [];
+
+      // Define the askQuestion function
+      function askQuestion(callback, question) {
+          var count = 0;
+          queue[user]['waiting'] = true;
+          slack.sendPM(user, question)
+          async.whilst(
+              function () {
+                  if (count >= 5) queue[user]['waiting'] = false
+                  if (queue[user]['waiting']) return true
+                  response = queue[user]['response'] || "Didn't answer in time"
+                  results[user].push(response)
+                  callback();
+              },
+              function (callback) {
+                  count++;
+                  setTimeout(callback, 2000);
+              },
+              whoops
+          );
+      }
+
+      // As the users the necessary questions
+      async.waterfall([
+          function (callback) {
+              var question = "*What are you working on right now?*";
+              askQuestion(callback, question)
+          },
+          function (callback) {
+              var question = "*When do you think you will be done with the task?*";
+              askQuestion(callback, question)
+          },
+          function (callback) {
+              var question = "*Any blockers?*";
+              askQuestion(callback, question)
+          }
+      ], function (err, result) {
+          // result now equals 'done'
+      });
+  }, whoops);
+
+  // Wait to get all the answers and then report back.
+  async.whilst(
+      function () {
+          if (Object.keys(results).length < users.length) return true
+          for (var responses in results) {
+              if (results.hasOwnProperty(responses)) {
+                  if (results[responses].length < 3) return true
+              }
+          }
+
+          function sendResponse(slack, message, index, results) {
+              for (var responses in results) {
+                  message = message + "> " + "<@" + responses + ">: " + results[responses][index] + "\r\n"
+              }
+              slack.sendMsg(data.channel, message)
+          }
+
+          slack.sendMsg(data.channel, "Ok, I'm done talking with everyone")
+          message = "> *What are you working on right now?* \r\n"
+          sendResponse(slack, message, 0, results)
+          message = "> *When do you think you will be done with the task?* \r\n"
+          sendResponse(slack, message, 1, results)
+          message = "> *Blockers* \r\n"
+          sendResponse(slack, message, 2, results)
+      },
+      function (callback) {
+          setTimeout(callback, 1000);
+      },
+      whoops
+  );
+};
