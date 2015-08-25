@@ -1,3 +1,5 @@
+var async        = require('async');
+
 // Error handler
 var whoops = function (err) {
     if (err) {
@@ -7,8 +9,15 @@ var whoops = function (err) {
 
 var waiting = true;
 
+exports.run = function(services) {
 
-exports.run = function(command,slack,async,data,queue) {
+//  eventEmitter.emit('slack', data.channel, output);
+  var data = services['data']
+  var command = services['command']
+  var queue = services['queue']
+  var eventEmitter = services['pubsub']
+  var slack = services['slack']
+
   var message = "Alright, checking in with the team. I'll report back ASAP";
   var users = command[1].split(' ');
   var results = [];
@@ -17,7 +26,8 @@ exports.run = function(command,slack,async,data,queue) {
   users = users.filter(Boolean);
 
   // Let the stakeholder know you are on it
-  slack.sendMsg(data.channel, message);
+  // slack.sendMsg(data.channel, message);
+  eventEmitter.emit('slack', data.channel, message);
 
   // Ask each user in parallel
   async.each(users, function (user, callback) {
@@ -30,7 +40,8 @@ exports.run = function(command,slack,async,data,queue) {
       function askQuestion(callback, question) {
           var count = 0;
           queue[user]['waiting'] = true;
-          slack.sendPM(user, question)
+          //slack.sendPM(user, question)
+          eventEmitter.emit('slackPM', user, question);
           async.whilst(
               function () {
                   if (count >= 5) queue[user]['waiting'] = false
@@ -80,7 +91,8 @@ exports.run = function(command,slack,async,data,queue) {
               for (var responses in results) {
                   message = message + "> " + "<@" + responses + ">: " + results[responses][index] + "\r\n"
               }
-              slack.sendMsg(data.channel, message)
+              eventEmitter.emit('slack', data.channel, message);
+              // slack.sendMsg(data.channel, message)
           }
 
           slack.sendMsg(data.channel, "Ok, I'm done talking with everyone")

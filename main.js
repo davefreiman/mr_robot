@@ -6,11 +6,14 @@
 
 
 // Requiring our module
-var slackAPI    = require('slackbotapi');
-var config      = require('./config');
-var async       = require('async');
-var cCase       = require('change-case');
-var commands    = require('auto-loader').load(__dirname +'/commands')
+var slackAPI     = require('slackbotapi');
+var config       = require('./config');
+var async        = require('async');
+var cCase        = require('change-case');
+var commands     = require('auto-loader').load(__dirname +'/commands')
+var util         = require('util');
+var events       = require('events');
+
 
 // Configure SlackClient
 var slack = new slackAPI({
@@ -20,8 +23,17 @@ var slack = new slackAPI({
 
 // Configuration for global variables
 var botName = config.slack.bot_name + ':';
-var queue = [];
+var eventEmitter = new events.EventEmitter();
 
+var queue = []; // TODO: Find a better way to handle this that doesn't involve a global variable
+
+eventEmitter.on('slack', function(recepient, message){
+    slack.sendMsg(recepient, message)
+});
+
+eventEmitter.on('slackPM', function(recepient, message){
+    slack.sendPM(recepient, message)
+});
 
 // Slack on EVENT message, send data.
 slack.on('message', function (data) {
@@ -51,10 +63,18 @@ slack.on('message', function (data) {
 
       // If plugin exists run the command and return the output
       if(commands.hasOwnProperty(action)){
-        var output = commands[action].run(command,slack,async,data,queue);
-        slack.sendMsg(data.channel, output)
+        var services = {
+          'command': command,
+          'pubsub': eventEmitter,
+          'queue': queue,
+          'data': data,
+          'slack': slack
+        }
+
+        var output = commands[action].run(services); // TODO: Remove high level of dependencies
+        eventEmitter.emit('slack', data.channel, output);
       } else {
-        slack.sendMsg(data.channel, "Sorry I don't know how to " + command[0].toLowerCase())
+        eventEmitter.emit('slack', data.channel, "Sorry I don't know how to " + command[0].toLowerCase());
       }
 
     }
