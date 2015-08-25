@@ -16,7 +16,6 @@ exports.run = function(services) {
   var command = services['command']
   var queue = services['queue']
   var eventEmitter = services['pubsub']
-  var slack = services['slack']
 
   var message = "Alright, checking in with the team. I'll report back ASAP";
   var users = command[1].split(' ');
@@ -26,21 +25,19 @@ exports.run = function(services) {
   users = users.filter(Boolean);
 
   // Let the stakeholder know you are on it
-  // slack.sendMsg(data.channel, message);
   eventEmitter.emit('slack', data.channel, message);
 
   // Ask each user in parallel
   async.each(users, function (user, callback) {
       user = user.replace('<@', '').replace('>', '');
-      userId = slack.getUser(user).id;
-      queue[user] = [];
+
+      queue[user]   = [];
       results[user] = [];
 
       // Define the askQuestion function
       function askQuestion(callback, question) {
           var count = 0;
           queue[user]['waiting'] = true;
-          //slack.sendPM(user, question)
           eventEmitter.emit('slackPM', user, question);
           async.whilst(
               function () {
@@ -87,7 +84,7 @@ exports.run = function(services) {
               }
           }
 
-          function sendResponse(slack, message, index, results) {
+          function sendResponse(message, index, results) {
               for (var responses in results) {
                   message = message + "> " + "<@" + responses + ">: " + results[responses][index] + "\r\n"
               }
@@ -95,13 +92,14 @@ exports.run = function(services) {
               // slack.sendMsg(data.channel, message)
           }
 
-          slack.sendMsg(data.channel, "Ok, I'm done talking with everyone")
+          eventEmitter.emit('slack', data.channel, "Ok, I'm done talking with everyone");
+
           message = "> *What are you working on right now?* \r\n"
-          sendResponse(slack, message, 0, results)
+          sendResponse(message, 0, results)
           message = "> *When do you think you will be done with the task?* \r\n"
-          sendResponse(slack, message, 1, results)
+          sendResponse(message, 1, results)
           message = "> *Blockers* \r\n"
-          sendResponse(slack, message, 2, results)
+          sendResponse(message, 2, results)
       },
       function (callback) {
           setTimeout(callback, 1000);

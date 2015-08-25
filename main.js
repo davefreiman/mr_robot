@@ -68,7 +68,6 @@ slack.on('message', function (data) {
           'pubsub': eventEmitter,
           'queue': queue,
           'data': data,
-          'slack': slack
         }
 
         var output = commands[action].run(services); // TODO: Remove high level of dependencies
