@@ -43,8 +43,8 @@ slack.on('message', function (data) {
     if (typeof queue[data.user] !== 'undefined') {
         // Only if is a direct message
         if (data.channel.charAt(0) === 'D') {
-            queue[data.user]['waiting'] = false
-            queue[data.user]['response'] = data.text
+            queue[data.user]['waiting']   = false
+            queue[data.user]['response']  = data.text
         }
     }
 
@@ -69,9 +69,7 @@ slack.on('message', function (data) {
           'queue': queue,
           'data': data,
         }
-
-        var output = commands[action].run(services); // TODO: Remove high level of dependencies
-        eventEmitter.emit('slack', data.channel, output);
+        commands[action].run(services);
       } else {
         eventEmitter.emit('slack', data.channel, "Sorry I don't know how to " + command[0].toLowerCase());
       }
